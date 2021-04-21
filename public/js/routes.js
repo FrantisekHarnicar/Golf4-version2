@@ -62,18 +62,15 @@ function createHtml4opinions(targetElm){
 }       
 
 
-function fetchAndDisplayArticles(targetElm,offsetFromHash,totalCountFromHash){
+function fetchAndDisplayArticles(targetElm,current){
     const url = "https://wt.kpi.fei.tuke.sk/api/article";
     const Pages = 20;
-    const offset =Number(offsetFromHash);
-    const totalCount = Number(totalCountFromHash);
-
-    let urlQuery = "";
-    if (offset && totalCount) {
-        urlQuery = `?offset=${(offset-1)*Pages}&max=${Pages}`;
-    } else {
-        urlQuery = `?max=${Pages}`;
-    }
+    if(localStorage.offset && current === undefined)
+        current = JSON.parse(localStorage.offset);
+    else 
+        if(current === undefined)
+            current = 1;
+    let urlQuery = `?offset=${(current-1)*Pages}&max=${Pages}`;
 
     const offsetUrl = `${url}${urlQuery}`;
 
@@ -131,6 +128,10 @@ function fetchAndDisplayArticles(targetElm,offsetFromHash,totalCountFromHash){
                     errMsgObj
                 );
         });
+
+        window.onbeforeunload = () => {
+            localStorage.removeItem('offset');
+        }
 }
 
 
@@ -151,4 +152,5 @@ function addPage(responseJSON, pages) {
 
     responseJSON.currPage = current;
     responseJSON.pageCount = tot;
+    window.localStorage.setItem('offset', current);
 }
