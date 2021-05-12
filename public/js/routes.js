@@ -4,6 +4,7 @@
 
 import Mustache from "./mustache.js";
 import processOpnFrmData from "./addOpinion.js";
+import articleFormsHandler from "./articleFormsHandler.js";
 
 //an array, defining the routes
 export default[
@@ -15,7 +16,8 @@ export default[
         target:"router-view",
         //the function that returns content to be rendered to the target html element:
         getTemplate:(targetElm) =>
-            document.getElementById(targetElm).innerHTML = document.getElementById("template-welcome").innerHTML
+            document.getElementById(targetElm).innerHTML = 
+                document.getElementById("template-welcome").innerHTML
     },
     
     {
@@ -29,18 +31,42 @@ export default[
         target:"router-view",
         getTemplate: createHtml4opinions
     },
+
+    {
+        hash:"addOpinion",
+        target:"router-view",
+        getTemplate: (targetElm) =>{
+            document.getElementById(targetElm).innerHTML = document.getElementById("template-addOpinion").innerHTML;
+            document.getElementById("formular").onsubmit=processOpnFrmData;
+        }
+    },
+
+    {
+        hash:"article",
+        target:"router-view",
+        getTemplate: fetchAndDisplayArticleDetail
+    },
     
     {
-    hash:"addOpinion",
-    target:"router-view",
-    getTemplate: (targetElm) =>{
-        document.getElementById(targetElm).innerHTML = document.getElementById("template-addOpinion").innerHTML;
-        document.getElementById("formular").onsubmit=processOpnFrmData;
+        hash:"artEdit",
+        target:"router-view",
+        getTemplate: editArticle
+    },
+    {
+        hash:"artDelete",
+        target:"router-view",
+        getTemplate: deleteArticle
+    },
+    {
+        hash:"addArticle",
+        target:"router-view",
+        getTemplate: insertArticle
     }
-}
-    
-
 ];
+
+const maxArticles = 20;
+const urlBase = "http://wt.kpi.fei.tuke.sk/api";
+
 
 function createHtml4opinions(targetElm){
     const opinionsFromStorage=localStorage.myTreesComments;
@@ -59,24 +85,171 @@ function createHtml4opinions(targetElm){
         document.getElementById("template-opinions").innerHTML,
         opinions
         );
-}       
+}
 
 
+
+
+function addArtDetailLink2ResponseJson(responseJSON){
+    responseJSON.articles = responseJSON.articles.map(
+      article =>(
+       {
+         ...article,
+         detailLink:`#article/${article.id}/${responseJSON.meta.offset}/${responseJSON.meta.totalCount}`
+       }
+      )
+    );
+}   
+
+
+
+function fetchAndProcessArticle(targetElm,artIdFromHash,offsetFromHash,totalCountFromHash,forEdit){
+    const url = `${urlBase}/article/${artIdFromHash}`;
+
+    fetch(url)
+        .then(response =>{
+            if(response.ok){
+                return response.json();
+            }else{ //if we get server error
+                return Promise.reject(
+                  new Error(`Server answered with ${response.status}: ${response.statusText}.`));
+            }
+        })
+        .then(responseJSON => {
+            if(forEdit){
+                responseJSON.formTitle="Article Edit";
+                responseJSON.submitBtTitle="Save article";
+                responseJSON.backLink=`#article/${artIdFromHash}/${offsetFromHash}/${totalCountFromHash}`;
+            
+                document.getElementById(targetElm).innerHTML =
+                    Mustache.render(
+                        document.getElementById("template-article-form").innerHTML,
+                        responseJSON
+                    );
+                if(!window.artFrmHandler){
+                    window.artFrmHandler= new articleFormsHandler("https://wt.kpi.fei.tuke.sk/api");
+                }
+                window.artFrmHandler.assignFormAndArticle("articleForm","hiddenElm",artIdFromHash,offsetFromHash,totalCountFromHash);
+            }else{
+                responseJSON.backLink=`#articles/${offsetFromHash}/${totalCountFromHash}`;
+                responseJSON.editLink=
+                  `#artEdit/${responseJSON.id}/${offsetFromHash}/${totalCountFromHash}`;
+                responseJSON.deleteLink=
+                  `#artDelete/${responseJSON.id}/${offsetFromHash}/${totalCountFromHash}`;
+
+                document.getElementById(targetElm).innerHTML =
+                    Mustache.render(
+                        document.getElementById("template-article").innerHTML,
+                        responseJSON
+                    );
+            }
+        })
+        .catch (error => { ////here we process all the failed promises
+            const errMsgObj = {errMessage:error};
+            document.getElementById(targetElm).innerHTML =
+                Mustache.render(
+                    document.getElementById("template-articles-error").innerHTML,
+                    errMsgObj
+                );
+        });
+}    
+
+function editArticle(targetElm, artIdFromHash, offsetFromHash, totalCountFromHash) {
+    fetchAndProcessArticle(...arguments,true);
+} 
+
+function fetchAndDisplayArticleDetail(targetElm,artIdFromHash,offsetFromHash,totalCountFromHash) {
+    fetchAndProcessArticle(...arguments,false);
+}  
+
+function deleteArticle(targetElm, artIdFromHash) {
+   fetch(`${urlBase}/article/${artIdFromHash}`, {method: 'DELETE'})
+   .then(()=>{
+       fetchAndDisplayArticles(targetElm, window.sessionStorage.getItem('articlesPage'));
+   });
+  }
+
+
+  function insertArticle (targetElm) {
+    let msrender = [];
+    document.getElementById(targetElm).innerHTML = Mustache.render(
+        document.getElementById("template-article-add").innerHTML,
+        msrender
+    );
+    document.getElementById("articleadd").addEventListener("submit", event => addArticle(event, targetElm));
+}
+
+function addArticle(event,targetElm,artIdFromHash,offsetFromHash,totalCountFromHash){
+    event.preventDefault();
+    
+    
+    const title= document.getElementById("title").value.trim();
+    const content= document.getElementById("content").value.trim();
+    const author= document.getElementById("author").value.trim();
+
+    const imageLink= document.getElementById("imageLink").value.trim();
+    const tags = "golf4";
+   
+    const articleData = {
+        title: title,
+        content: content,
+        author: author,
+        imageLink: imageLink,
+        tags : tags
+    };
+
+    const url = `${urlBase}/article/`;
+
+    const postReqSettings = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json;charset=utf-8',
+                },
+                body: JSON.stringify(articleData)
+            };
+
+    fetch(url, postReqSettings)
+    .then(response => {      //fetch promise fullfilled (operation completed successfully)
+        if (response.ok) {    //successful execution includes an error response from the server. So we have to check the return status of the response here.
+            return response.json(); //we return a new promise with the response data in JSON to be processed
+        } else { //if we get server error
+            return Promise.reject(
+                new Error(`Server answered with ${response.status}: ${response.statusText}.`)); //we return a rejected promise to be catched later
+        }
+    })
+    .then(responseJSON => {
+        const id = Number(responseJSON.id);
+        window.location.hash = `article/${id}`;
+    })
+    .catch (error => { ////here we process all the failed promises
+        const errMsgObj = {errMessage:error};
+        document.getElementById(targetElm).innerHTML =
+            Mustache.render(
+                document.getElementById("template-articles-error").innerHTML,
+                errMsgObj
+            );
+    });
+}
 function fetchAndDisplayArticles(targetElm,current){
-    const url = "https://wt.kpi.fei.tuke.sk/api/article";
-    const Pages = 20;
-    if(localStorage.offset && current === undefined)
-        current = JSON.parse(localStorage.offset);
+
+    let articleList = [];
+    
+    if(current === undefined && localStorage.current)
+        current = JSON.parse(localStorage.current);
     else 
         if(current === undefined)
             current = 1;
-    let urlQuery = `?offset=${(current-1)*Pages}&max=${Pages}`;
 
-    const offsetUrl = `${url}${urlQuery}`;
 
-    let articleList =[];
+    console.log("current " + current);
 
-    fetch(offsetUrl)  //there may be a second parameter, an object wih options, but we do not need it now.
+    const offset = ((current-1)*maxArticles);
+
+
+    const fetchUrl = `${urlBase}/article/?tag=golf4&max=${maxArticles}&offset=${offset}`;
+
+
+    fetch(fetchUrl)  //there may be a second parameter, an object wih options, but we do not need it now.
         .then(response =>{
             if(response.ok){
                 return response.json();
@@ -85,13 +258,14 @@ function fetchAndDisplayArticles(targetElm,current){
             }
         })
         .then(responseJSON => {
-            addPage(responseJSON,Pages);
+            showNewPage(responseJSON,maxArticles);
             articleList=responseJSON;
+            addArtDetailLink2ResponseJson(responseJSON);
             return Promise.resolve();
         })
         .then( ()=> {
             let cntRequests = articleList.articles.map(
-                article => fetch(`${url}/${article.id}`)
+                article => fetch(`${urlBase}/article/${article.id}`)
             );
             return Promise.all(cntRequests);
         })
@@ -130,27 +304,29 @@ function fetchAndDisplayArticles(targetElm,current){
         });
 
         window.onbeforeunload = () => {
-            localStorage.removeItem('offset');
+            localStorage.removeItem('current');
         }
 }
 
+  
 
-function addPage(responseJSON, pages) {
+function showNewPage(responseJSON, maxArticlesToShow) {
     const offset = Number(responseJSON.meta.offset);
     const total = Number(responseJSON.meta.totalCount);
 
-    let current = Math.ceil(offset/pages) + 1;
-    let tot = Math.ceil(total/pages);
+    let current = Math.ceil(offset/maxArticlesToShow) + 1;
+    let tot = Math.ceil(total/maxArticlesToShow);
 
     if (current > 1) {
         responseJSON.prevPage = current - 1;
     }
 
-    if ((offset + pages) < total) {
+    if ((offset + maxArticlesToShow) < total) {
         responseJSON.nextPage = current + 1;
     }
 
     responseJSON.currPage = current;
     responseJSON.pageCount = tot;
-    window.localStorage.setItem('offset', current);
+
+    window.localStorage.setItem('current', current); 
 }

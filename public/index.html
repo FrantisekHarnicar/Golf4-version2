@@ -2,6 +2,7 @@
 <html lang="sk">
   <head>
     <meta charset="UTF-8" />
+    <meta name="google-signin-client_id" content="354148244333-6jae2hcoavop3isj7ocp8mbjtl0mhuvo.apps.googleusercontent.com">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="author" content="Frantisek Harnicar" />
     <link rel="stylesheet" href="css/screenStyle.css" media="screen" />
@@ -25,6 +26,7 @@
             <ul class="hlavny_baner">
                 <li><a href="#welcome">Domov</a></li>
                 <li><a href="#articles">Clanky</a></li>
+                <li><a href="#addArticle">Pridat Clanok</a></li>
                 <li><a href="#opinions">Komentare</a></li>
                 <li><a href="#addOpinion">Spätná väzba</a></li>
             </ul>
@@ -34,8 +36,14 @@
 
 
 <main id="router-view">
+  
 </main>
-
+<aside id="googleSignIn">
+  <div id="SignInButton"></div>
+  <div id="SignedIn">
+      Ste prihlásený ako <span id="userName"></span> <button onclick="signOut()">Odhlásiť sa</button>
+  </div>
+</aside>
 <footer>
     Všetky práva vyhradené © 2021 <a id="footer_text" href="mailto:franek1370@gmail.com">Frantisek Harnicar</a>
   </footer>
@@ -64,7 +72,7 @@
     {{#articles}}
     <article class="clanok">
         <div class="title_autor">
-        <div class="title">{{title}} </div>
+        <div class="title"><a href="{{detailLink}}">{{title}}</a></div>
         <div class="autor">
             {{author}}
           </div>
@@ -136,7 +144,7 @@
 <script id="template-addOpinion" type="text/template">
     <article  id="artOpnFrm">
         
-        <form method="get" target="frmRes" id="formular">
+        <form method="get" target="frmRes" id="formular" class="formular">
             <h3>Tu mi mozes zanechat komentar</h2>
             <div class="option">
               <label for="name">*Meno</label>
@@ -210,13 +218,152 @@
             </div>
           </form>
     </article>
-</script>      
+</script>     
+
+<script id="template-article" type="text/template">
+  
+  <article class="clanok">
+    <div class="title_autor">
+      <div class="title">{{title}}</div>
+    
+    <div class="autor">
+          by {{author}}
+        </div>
+      </div>
+      
+      <div class="content">{{{content}}}</div>
+      {{#imageLink}}
+      <figure>
+          <img src="{{imageLink}}" alt="article figure" />
+      </figure>
+      {{/imageLink}}
+  </article>
+
+  <div class="navigacia">
+      <a href="{{backLink}}" class="linkAsButton"><< Back</a>
+      <a href="{{editLink}}" class="linkAsButton">Edit</a>
+      <a href="{{deleteLink}}" class="linkAsButton">Delete</a>
+  </div>
+
+</script>  
+
+<script id="template-article-form" type="text/template">
+  <article>
+      <h2>{{formTitle}}</h2> <br><br>
+
+      <form id="articleForm" class="formular">
+          <label for="author">Author:</label>
+          <input type="text" name="author" id="author" value="{{author}}" size="50" 
+                 title="Article author, max. length 100 characters." 
+                 maxlength="100" placeholder="e.g. Ján Trieska" />
+          <br>
+          <label for="title">Title:</label>
+          <input type="text" name="title" id="title" value="{{title}}" size="50"  
+                 maxlength="100" pattern="\S[\S\s]*" placeholder="e.g. My story." required 
+                 title="Article title, mandatory item, max. length: 100 characters. 
+The first character must not be a space."  />
+          <br>
+          <label for="imageLink">Image (url):</label>
+          <input type="url" name="imageLink" id="imageLink" value="{{imageLink}}" size="50" 
+                 title="Image URL, max. length 100 characters." maxlength="100"/>
+          <br>
+          <label></label>
+          <button type="button" id="btShowFileUpload">
+              Upload image
+          </button>
+
+          <fieldset class="added hiddenElm" id="fsetFileUpload">
+              <legend>Image Upload</legend>
+              <input type="file" id="flElm" name="file" accept="image/jpeg, image/png"/>
+              <br />
+              <button type="button" id="btFileUpload">
+                  Send image to server </button>
+              <button type="button" id="btCancelFileUpload">
+                  Cancel uploading </button>
+          </fieldset>
+
+
+          <br>
+          <label for="content">Article content:</label>
+          <textarea
+                  name="content" id="content" spellcheck="true" lang="sk"
+                  cols="50" rows="20" required
+                  title="Article content, mandatory item, can be plain text or in HTML.">{{content}}</textarea>
+          <br>
+          <div class="navigacia">
+          <button type="reset"> Reset Form </button>
+          <button type="submit"> {{submitBtTitle}} </button>
+          </div>
+      </form>
+  </article>
+
+  <div class="navigacia">
+      <a href="{{backLink}}" class="linkAsButton"><< Back</a>
+  </div>
+</script>   
+
+
+<script id="template-article-add" type="text/template">
+    <article>
+        <br>
+
+        <form id="articleadd" class="formular">
+            <label for="author">Author:</label>
+            <input type="text" name="author" id="author" value="{{author}}" size="50" 
+                   title="Article author, max. length 100 characters." 
+                   maxlength="100" placeholder="e.g. Ján Trieska" />
+            <br>
+            <label for="title">Title:</label>
+            <input type="text" name="title" id="title" value="{{title}}" size="50"  
+                   maxlength="100" pattern="\S[\S\s]*" placeholder="e.g. My story." required 
+                   title="Article title, mandatory item, max. length: 100 characters. 
+The first character must not be a space."  />
+            <br>
+            <label for="imageLink">Image (url):</label>
+            <input type="url" name="imageLink" id="imageLink" value="{{imageLink}}" size="50" 
+                   title="Image URL, max. length 100 characters." maxlength="100"/>
+            <br>
+            <label></label>
+            <button type="button" id="btShowFileUpload">
+                Upload image
+            </button>
+
+            <fieldset class="added hiddenElm" id="fsetFileUpload">
+                <legend>Image Upload</legend>
+                <input type="file" id="flElm" name="file" accept="image/jpeg, image/png"/>
+                <br />
+                <button type="button" id="btFileUpload">
+                    Send image to server </button>
+                <button type="button" id="btCancelFileUpload">
+                    Cancel uploading </button>
+            </fieldset>
+
+
+            <br>
+            <label for="content">Article content:</label>
+            <textarea
+                    name="content" id="content" spellcheck="true" lang="sk"
+                    cols="50" rows="20" required
+                    title="Article content, mandatory item, can be plain text or in HTML.">{{content}}</textarea>
+            <br>
+            <div class="navigacia">
+            <button type="reset"> Reset Form </button>
+            <button type="submit">Submit</button>
+            </div>
+
+        </form>
+    </article>
+
+    <div class="navigacia">
+        <a href="{{backLink}}" class="linkAsButton"><< Back</a>
+    </div>
+</script>
 
 <!--JavaScript code, inserted as a module-->
 <script  type="module" src="js/index.js"></script>
-
-
-
+<script src="js/articleFormsHandler.js"></script>
+<script src="js/82GoogleAccessBetter.js"></script>
+<script src="https://apis.google.com/js/platform.js?onload=startGSingIn" async defer></script>
 
 
 </body>
